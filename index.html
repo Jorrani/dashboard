@@ -197,13 +197,13 @@
     <script>
         const USER_AUTH = "admin";
         const PASS_AUTH = "elog2024";
-        const SESSION_TIME = 30 * 60 * 1000;
+        const SESSION_TIME = 30 * 60 * 1000; // 30 Minutos
         let DADOS_ORIGINAIS = [];
         let selectTerminal, selectOperador, selectVeiculo;
 
         const OPERADORES = { 
             "164": "JORRANI SALLES", "165": "THAINA DO NASCIMENTO", "167": "NAUZIDE MARIA",
-            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE TATIANA COUTINHO", "177": "MARILUCE MARIA",
+            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE COUTINHO", "177": "MARILUCE MARIA",
             "188": "PAULO FILHO", "234": "CAMILA BASTOS", "239": "LUIS SABINO",
             "251": "ERIKSON SILVA", "256": "TATIELE DE PAULA", "257": "AMANDA TATIANE",
             "260": "BRUNO OLIVEIRA", "261": "CELIA GONDIM", "262": "EDILSON NASCIMENTO",
@@ -212,11 +212,13 @@
         };
 
         window.onload = () => {
+            verificarSessao();
+            setInterval(verificarSessao, 10000); // Checa a cada 10s
+
             selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TERMINAIS' } });
             selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'OPERADORES' } });
             selectVeiculo = new SlimSelect({ select: '#filter-veiculo', settings: { placeholderText: 'VEÍCULOS' } });
 
-            // Funcionalidade de Login com Enter
             const inputs = [document.getElementById('user-input'), document.getElementById('pass-input')];
             inputs.forEach(input => {
                 input.addEventListener('keypress', (e) => {
@@ -225,13 +227,26 @@
             });
         };
 
+        function verificarSessao() {
+            const exp = localStorage.getItem('elog_session_exp');
+            if (exp) {
+                if (new Date().getTime() > parseInt(exp)) {
+                    logout();
+                } else if (document.getElementById('dashboard-wrapper').style.display !== 'block') {
+                    iniciarSistema();
+                }
+            }
+        }
+
         function tentarLogin() {
             const u = document.getElementById('user-input').value;
             const p = document.getElementById('pass-input').value;
             if (u === USER_AUTH && p === PASS_AUTH) {
                 localStorage.setItem('elog_session_exp', new Date().getTime() + SESSION_TIME);
                 iniciarSistema();
-            } else { document.getElementById('login-error').classList.remove('hidden'); }
+            } else { 
+                document.getElementById('login-error').classList.remove('hidden'); 
+            }
         }
 
         function iniciarSistema() {
@@ -281,7 +296,6 @@
                 const terminal = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
                 const idOp = l['Usuário']?.toString();
                 
-                // Lógica do filtro de veículo
                 const vTipo = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
                 let veiculoMatch = true;
                 if (fVeics.length > 0) {
@@ -368,14 +382,17 @@
 
             const ub = document.getElementById('user-detail-body'); ub.innerHTML = '';
             Object.keys(users).sort((a,b) => users[b].total - users[a].total).forEach((u, idx) => {
-                const d = users[u]; const sS = localStorage.getItem(`sangria_${u}`) || 0;
+                const d = users[u]; 
+                const sS = localStorage.getItem(`sangria_${u}`) || 0;
+                const sF = localStorage.getItem(`falta_${u}`) || 0;
+
                 ub.innerHTML += `<tr>
                     <td class="nome-operador">${u}</td>
                     <td><canvas id="mini-${idx}" width="35" height="35"></canvas></td>
                     <td class="bg-emerald-50">${fmtMoeda(d.d.v)} <span class="qtd-sub">${d.d.q} Op</span></td>
-                    <td class="bg-red-50"><div class="input-wrapper">R$<input type="number" value="${sS}" class="input-money" oninput="atMalote(this, '${u}', ${d.d.v})"></div></td>
+                    <td class="bg-red-50"><div class="input-wrapper">R$<input type="number" value="${sS}" class="input-money" oninput="salvarInput(this, 'sangria_${u}', '${u}', ${d.d.v})"></div></td>
                     <td class="bg-emerald-100 font-black" id="malote-${u}">${fmtMoeda(d.d.v - sS)}</td>
-                    <td class="bg-slate-50"><div class="input-wrapper">R$<input type="number" class="input-money"></div></td>
+                    <td class="bg-slate-50"><div class="input-wrapper">R$<input type="number" value="${sF}" class="input-money" oninput="salvarInput(this, 'falta_${u}')"></div></td>
                     <td>${fmtMoeda(d.px.v)} <span class="qtd-sub">${d.px.q} Op</span></td>
                     <td>${fmtMoeda(d.pxm.v)} <span class="qtd-sub">${d.pxm.q} Op</span></td>
                     <td>${fmtMoeda(d.cr.v)} <span class="qtd-sub">${d.cr.q} Op</span></td>
@@ -390,7 +407,17 @@
             renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users);
         }
 
-        function atMalote(i, u, d) { localStorage.setItem(`sangria_${u}`, i.value); document.getElementById(`malote-${u}`).innerText = fmtMoeda(d - (parseFloat(i.value)||0)); }
+        // Função genérica para salvar dados digitados
+        function salvarInput(el, key, user, dinheiro) {
+            const val = el.value || 0;
+            localStorage.setItem(key, val);
+            
+            // Se for sangria, atualiza o malote em tempo real
+            if (user) {
+                document.getElementById(`malote-${user}`).innerText = fmtMoeda(dinheiro - parseFloat(val));
+            }
+        }
+
         function renderMiniChart(id, d) { new Chart(document.getElementById(id), { type: 'doughnut', data: { datasets: [{ data: [d.d.v, d.px.v, d.ft.v, d.cr.v + d.db.v + d.mn.v], backgroundColor: ['#10b981', '#f7a61a', '#004687', '#3b82f6'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false }, datalabels: { display: false } }, maintainAspectRatio: false } }); }
 
         function renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users) {
@@ -419,7 +446,7 @@
             charts.term = new Chart(document.getElementById('chartTerminais'), { type: 'bar', data: { labels: tSort.map(x=>x[0]), datasets: [{ data: tSort.map(x=>x[1]), backgroundColor: '#3b82f6' }] }, options: barOptions(false) });
         }
 
-        function limparSistema() { if(confirm('Resetar dados?')) { localStorage.clear(); location.reload(); } }
+        function limparSistema() { if(confirm('Resetar dados (incluindo sangrias e faltas)?')) { localStorage.clear(); location.reload(); } }
         function logout() { localStorage.removeItem('elog_session_exp'); location.reload(); }
     </script>
 </body>
