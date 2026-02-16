@@ -107,33 +107,12 @@
 
             <div id="exec-section" class="hidden">
                 <div class="filter-panel no-print">
-                    <div class="filter-group">
-                        <label class="filter-label">Início</label>
-                        <input type="datetime-local" id="filter-start" class="filter-input" onchange="filtrarDados()">
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Fim</label>
-                        <input type="datetime-local" id="filter-end" class="filter-input" onchange="filtrarDados()">
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Terminais</label>
-                        <select id="filter-terminal" multiple onchange="filtrarDados()"></select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Operadores</label>
-                        <select id="filter-operador" multiple onchange="filtrarDados()"></select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Veículo</label>
-                        <select id="filter-veiculo" multiple onchange="filtrarDados()">
-                            <option value="truck">TRUCK</option>
-                            <option value="carreta">CARRETA</option>
-                            <option value="bitrem">BITREM</option>
-                        </select>
-                    </div>
-                    <div class="filter-group justify-end">
-                        <button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Reset</button>
-                    </div>
+                    <div class="filter-group"><label class="filter-label">Início</label><input type="datetime-local" id="filter-start" class="filter-input" onchange="filtrarDados()"></div>
+                    <div class="filter-group"><label class="filter-label">Fim</label><input type="datetime-local" id="filter-end" class="filter-input" onchange="filtrarDados()"></div>
+                    <div class="filter-group"><label class="filter-label">Terminais</label><select id="filter-terminal" multiple onchange="filtrarDados()"></select></div>
+                    <div class="filter-group"><label class="filter-label">Operadores</label><select id="filter-operador" multiple onchange="filtrarDados()"></select></div>
+                    <div class="filter-group"><label class="filter-label">Veículo</label><select id="filter-veiculo" multiple onchange="filtrarDados()"><option value="truck">TRUCK</option><option value="carreta">CARRETA</option><option value="bitrem">BITREM</option></select></div>
+                    <div class="filter-group justify-end"><button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Reset</button></div>
                 </div>
 
                 <div class="grid grid-cols-7 gap-4 mb-8">
@@ -177,13 +156,7 @@
                                 <th class="bg-red-50 text-red-600">Sangria</th>
                                 <th class="bg-emerald-100">Malote</th>
                                 <th class="bg-slate-50">± Falta</th>
-                                <th>Pix</th>
-                                <th>Pix M.</th>
-                                <th>Crédito</th>
-                                <th>Débito</th>
-                                <th>C. Manual</th>
-                                <th>Faturado</th>
-                                <th>Grátis</th>
+                                <th>Pix</th><th>Pix M.</th><th>Crédito</th><th>Débito</th><th>C. Manual</th><th>Faturado</th><th>Grátis</th>
                                 <th class="bg-[#004687] text-white">Total Acumulado</th>
                             </tr>
                         </thead>
@@ -197,7 +170,7 @@
     <script>
         const USER_AUTH = "admin";
         const PASS_AUTH = "elog2024";
-        const SESSION_TIME = 30 * 60 * 1000; // 30 Minutos
+        const SESSION_DURATION = 30 * 60 * 1000; // 30 Minutos
         let DADOS_ORIGINAIS = [];
         let selectTerminal, selectOperador, selectVeiculo;
 
@@ -212,29 +185,33 @@
         };
 
         window.onload = () => {
-            verificarSessao();
-            setInterval(verificarSessao, 10000); // Checa a cada 10s
-
             selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TERMINAIS' } });
             selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'OPERADORES' } });
             selectVeiculo = new SlimSelect({ select: '#filter-veiculo', settings: { placeholderText: 'VEÍCULOS' } });
 
-            const inputs = [document.getElementById('user-input'), document.getElementById('pass-input')];
-            inputs.forEach(input => {
-                input.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') tentarLogin();
-                });
-            });
+            verificarSessao();
+            setInterval(verificarSessao, 5000); // Checa expiração a cada 5s
+
+            const cacheDados = localStorage.getItem('elog_data_cache');
+            if (cacheDados) {
+                DADOS_ORIGINAIS = JSON.parse(cacheDados);
+                popularFiltros(DADOS_ORIGINAIS);
+                document.getElementById('exec-section').classList.remove('hidden');
+                filtrarDados();
+            }
+
+            const logInputs = [document.getElementById('user-input'), document.getElementById('pass-input')];
+            logInputs.forEach(inp => inp.addEventListener('keypress', (e) => { if (e.key === 'Enter') tentarLogin(); }));
         };
 
         function verificarSessao() {
             const exp = localStorage.getItem('elog_session_exp');
-            if (exp) {
-                if (new Date().getTime() > parseInt(exp)) {
-                    logout();
-                } else if (document.getElementById('dashboard-wrapper').style.display !== 'block') {
-                    iniciarSistema();
-                }
+            const agora = new Date().getTime();
+            if (exp && agora < parseInt(exp)) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard-wrapper').style.display = 'block';
+            } else {
+                logout();
             }
         }
 
@@ -242,16 +219,18 @@
             const u = document.getElementById('user-input').value;
             const p = document.getElementById('pass-input').value;
             if (u === USER_AUTH && p === PASS_AUTH) {
-                localStorage.setItem('elog_session_exp', new Date().getTime() + SESSION_TIME);
-                iniciarSistema();
-            } else { 
-                document.getElementById('login-error').classList.remove('hidden'); 
+                const expTime = new Date().getTime() + SESSION_DURATION;
+                localStorage.setItem('elog_session_exp', expTime);
+                verificarSessao();
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
             }
         }
 
-        function iniciarSistema() {
-            document.getElementById('login-screen').style.display = 'none';
-            document.getElementById('dashboard-wrapper').style.display = 'block';
+        function logout() {
+            localStorage.removeItem('elog_session_exp');
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('dashboard-wrapper').style.display = 'none';
         }
 
         function processarArquivo(e) {
@@ -261,6 +240,7 @@
                 const data = new Uint8Array(evt.target.result);
                 const wb = XLSX.read(data, { type: 'array', cellDates: true });
                 DADOS_ORIGINAIS = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                localStorage.setItem('elog_data_cache', JSON.stringify(DADOS_ORIGINAIS));
                 popularFiltros(DADOS_ORIGINAIS);
                 document.getElementById('exec-section').classList.remove('hidden');
                 filtrarDados();
@@ -269,185 +249,192 @@
         }
 
         function popularFiltros(dados) {
-            const terminais = [...new Set(dados.map(l => (l['Terminal'] || l['Equipamento'] || "Pista").toString()))].sort();
-            const idsOps = [...new Set(dados.map(l => l['Usuário']?.toString()))].filter(id => id && id !== "undefined").sort();
-            selectTerminal.setData(terminais.map(t => ({ text: t, value: t })));
-            selectOperador.setData(idsOps.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id })));
-        }
-
-        function resetarFiltros() {
-            document.getElementById('filter-start').value = "";
-            document.getElementById('filter-end').value = "";
-            selectTerminal.setSelected([]);
-            selectOperador.setSelected([]);
-            selectVeiculo.setSelected([]);
-            filtrarDados();
+            const terms = [...new Set(dados.map(l => (l['Terminal'] || l['Equipamento'] || "Pista").toString()))].sort();
+            const ops = [...new Set(dados.map(l => l['Usuário']?.toString()))].filter(id => id && id !== "undefined").sort();
+            selectTerminal.setData(terms.map(t => ({ text: t, value: t })));
+            selectOperador.setData(ops.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id })));
         }
 
         function filtrarDados() {
-            const fStart = document.getElementById('filter-start').value;
-            const fEnd = document.getElementById('filter-end').value;
-            const fTerms = selectTerminal.getSelected();
-            const fOps = selectOperador.getSelected();
-            const fVeics = selectVeiculo.getSelected();
+            const fS = document.getElementById('filter-start').value;
+            const fE = document.getElementById('filter-end').value;
+            const fT = selectTerminal.getSelected();
+            const fO = selectOperador.getSelected();
+            const fV = selectVeiculo.getSelected();
 
             const filtrados = DADOS_ORIGINAIS.filter(l => {
                 const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
-                const terminal = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
-                const idOp = l['Usuário']?.toString();
+                const term = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                const op = l['Usuário']?.toString();
+                const vT = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
                 
-                const vTipo = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
-                let veiculoMatch = true;
-                if (fVeics.length > 0) {
-                    veiculoMatch = fVeics.some(f => vTipo.includes(f));
-                }
-
-                if(fStart && dObj < new Date(fStart)) return false;
-                if(fEnd && dObj > new Date(fEnd)) return false;
-                if(fTerms.length > 0 && !fTerms.includes(terminal)) return false;
-                if(fOps.length > 0 && !fOps.includes(idOp)) return false;
-                if(!veiculoMatch) return false;
+                let vMatch = fV.length === 0 || fV.some(f => vT.includes(f));
+                if(fS && dObj < new Date(fS)) return false;
+                if(fE && dObj > new Date(fE)) return false;
+                if(fT.length > 0 && !fT.includes(term)) return false;
+                if(fO.length > 0 && !fO.includes(op)) return false;
+                if(!vMatch) return false;
                 return true;
             });
-
             atualizarPainel(filtrados);
         }
 
-        function extrairDataObjeto(valor) {
-            if (!valor) return null;
-            let d = new Date(valor);
+        function extrairDataObjeto(val) {
+            if (!val) return null;
+            let d = new Date(val);
             if (isNaN(d.getTime())) {
-                const partes = valor.toString().split(/[\/\s:]/);
-                if (partes.length >= 3) d = new Date(partes[2], partes[1] - 1, partes[0], partes[3] || 0, partes[4] || 0);
+                const p = val.toString().split(/[\/\s:]/);
+                if (p.length >= 3) d = new Date(p[2], p[1] - 1, p[0], p[3] || 0, p[4] || 0);
             }
             return d;
         }
 
         Chart.register(ChartDataLabels);
         let charts = {};
-        const fmtMoeda = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        const fmtM = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
         function atualizarPainel(dados) {
             let resG = { d:0, px:0, pxm:0, cr:0, db:0, mn:0, ft:0, gr:0, total:0 };
-            let users = {}, triVeic = { truck:0, carreta:0, bitrem:0 }, terms = {}, fluxoHoraTerminal = {}, fluxoHoraTotal = {}, datasEncontradas = [];
-            
+            let users = {}, triV = { truck:0, carreta:0, bitrem:0 }, terms = {}, hT = {}, hTerm = {}, dts = [];
+
             dados.forEach(l => {
-                let vRaw = l['Valor'] || 0;
-                if (typeof vRaw === 'string') vRaw = parseFloat(vRaw.replace(/[R$\s.]/g, '').replace(',', '.'));
-                const v = parseFloat(vRaw) || 0;
-                const t = (l['Tipo de Pagamento'] || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                let vR = l['Valor'] || 0;
+                if (typeof vR === 'string') vR = parseFloat(vR.replace(/[R$\s.]/g, '').replace(',', '.'));
+                const v = parseFloat(vR) || 0;
+                const tp = (l['Tipo de Pagamento'] || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
                 const id = l['Usuário']?.toString();
-                const nome = OPERADORES[id] || id;
-                const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
-                
-                if (dObj && !isNaN(dObj.getTime())) {
-                    datasEncontradas.push(dObj);
-                    const hLabel = dObj.getHours().toString().padStart(2, '0') + "h";
-                    fluxoHoraTotal[hLabel] = (fluxoHoraTotal[hLabel] || 0) + 1;
-                    const term = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
-                    if (!fluxoHoraTerminal[term]) fluxoHoraTerminal[term] = {};
-                    fluxoHoraTerminal[term][hLabel] = (fluxoHoraTerminal[term][hLabel] || 0) + 1;
-                    terms[term] = (terms[term] || 0) + 1;
+                const nm = OPERADORES[id] || id;
+                const dO = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
+
+                if (dO && !isNaN(dO.getTime())) {
+                    dts.push(dO);
+                    const hl = dO.getHours().toString().padStart(2, '0') + "h";
+                    hT[hl] = (hT[hl] || 0) + 1;
+                    const tm = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                    if (!hTerm[tm]) hTerm[tm] = {};
+                    hTerm[tm][hl] = (hTerm[tm][hl] || 0) + 1;
+                    terms[tm] = (terms[tm] || 0) + 1;
                 }
 
-                if (!nome || nome === "undefined") return;
-                if(!users[nome]) users[nome] = { d:{v:0, q:0}, px:{v:0, q:0}, pxm:{v:0, q:0}, cr:{v:0, q:0}, db:{v:0, q:0}, mn:{v:0, q:0}, ft:{v:0, q:0}, gr:{v:0, q:0}, total:0, qtd:0 };
-                
-                users[nome].qtd++; users[nome].total += v; resG.total += v;
-                if (t.includes('dinheiro')) { users[nome].d.v += v; users[nome].d.q++; resG.d += v; } 
-                else if (t === 'pix') { users[nome].px.v += v; users[nome].px.q++; resG.px += v; } 
-                else if (t.includes('pix manual')) { users[nome].pxm.v += v; users[nome].pxm.q++; resG.pxm += v; } 
-                else if (t.includes('credito')) { users[nome].cr.v += v; users[nome].cr.q++; resG.cr += v; } 
-                else if (t.includes('debito')) { users[nome].db.v += v; users[nome].db.q++; resG.db += v; } 
-                else if (t.includes('cartao') || t.includes('manual')) { users[nome].mn.v += v; users[nome].mn.q++; resG.mn += v; }
-                else if (t.includes('faturado')) { users[nome].ft.v += v; users[nome].ft.q++; resG.ft += v; }
-                else if (t.includes('gratis')) { users[nome].gr.q++; }
+                if (!nm || nm === "undefined") return;
+                if(!users[nm]) users[nm] = { d:{v:0,q:0}, px:{v:0,q:0}, pxm:{v:0,q:0}, cr:{v:0,q:0}, db:{v:0,q:0}, mn:{v:0,q:0}, ft:{v:0,q:0}, gr:{v:0,q:0}, total:0, qtd:0, dRef:'' };
+                if(!users[nm].dRef && dO) users[nm].dRef = dO.toLocaleDateString('pt-BR').replace(/\//g,'');
 
-                const veic = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
-                if (veic.includes('truck')) triVeic.truck++; else if (veic.includes('bitrem')) triVeic.bitrem++; else triVeic.carreta++;
+                users[nm].qtd++; users[nm].total += v; resG.total += v;
+                if (tp.includes('dinheiro')) { users[nm].d.v += v; users[nm].d.q++; resG.d += v; }
+                else if (tp === 'pix') { users[nm].px.v += v; users[nm].px.q++; resG.px += v; }
+                else if (tp.includes('pix manual')) { users[nm].pxm.v += v; users[nm].pxm.q++; resG.pxm += v; }
+                else if (tp.includes('credito')) { users[nm].cr.v += v; users[nm].cr.q++; resG.cr += v; }
+                else if (tp.includes('debito')) { users[nm].db.v += v; users[nm].db.q++; resG.db += v; }
+                else if (tp.includes('cartao') || tp.includes('manual')) { users[nm].mn.v += v; users[nm].mn.q++; resG.mn += v; }
+                else if (tp.includes('faturado')) { users[nm].ft.v += v; users[nm].ft.q++; resG.ft += v; }
+                else if (tp.includes('gratis')) { users[nm].gr.q++; }
+
+                const vc = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
+                if (vc.includes('truck')) triV.truck++; else if (vc.includes('bitrem')) triV.bitrem++; else triV.carreta++;
             });
 
-            if (datasEncontradas.length > 0) {
-                datasEncontradas.sort((a, b) => a - b);
-                const f = (d) => d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-                document.getElementById('periodo-relatorio').innerHTML = `<span class="text-blue-600">INÍCIO: ${f(datasEncontradas[0])}</span><br><span class="text-orange-600">FIM: ${f(datasEncontradas[datasEncontradas.length-1])}</span>`;
+            if (dts.length > 0) {
+                dts.sort((a,b)=>a-b);
+                const _f = (d) => d.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+                document.getElementById('periodo-relatorio').innerHTML = `<span class="text-blue-600">INÍCIO: ${_f(dts[0])}</span><br><span class="text-orange-600">FIM: ${_f(dts[dts.length-1])}</span>`;
             }
 
-            document.getElementById('total-geral').innerText = fmtMoeda(resG.total);
+            document.getElementById('total-geral').innerText = fmtM(resG.total);
             document.getElementById('total-liberacoes').innerText = dados.length;
-            document.getElementById('kpi-dinheiro').innerText = fmtMoeda(resG.d);
-            document.getElementById('kpi-pix').innerText = fmtMoeda(resG.px + resG.pxm);
-            document.getElementById('kpi-cartoes').innerText = fmtMoeda(resG.cr + resG.db + resG.mn);
-            document.getElementById('kpi-faturado').innerText = fmtMoeda(resG.ft);
+            document.getElementById('kpi-dinheiro').innerText = fmtM(resG.d);
+            document.getElementById('kpi-pix').innerText = fmtM(resG.px + resG.pxm);
+            document.getElementById('kpi-cartoes').innerText = fmtM(resG.cr + resG.db + resG.mn);
+            document.getElementById('kpi-faturado').innerText = fmtM(resG.ft);
 
-            const ub = document.getElementById('user-detail-body'); ub.innerHTML = '';
-            Object.keys(users).sort((a,b) => users[b].total - users[a].total).forEach((u, idx) => {
-                const d = users[u]; 
-                const sS = localStorage.getItem(`sangria_${u}`) || 0;
-                const sF = localStorage.getItem(`falta_${u}`) || 0;
+            const body = document.getElementById('user-detail-body'); body.innerHTML = '';
+            Object.keys(users).sort((a,b)=>users[b].total - users[a].total).forEach((u, i) => {
+                const d = users[u];
+                const key = d.dRef || 'sd';
+                const sS = localStorage.getItem(`sangria_${u}_${key}`) || 0;
+                const sF = localStorage.getItem(`falta_${u}_${key}`) || 0;
 
-                ub.innerHTML += `<tr>
+                body.innerHTML += `<tr>
                     <td class="nome-operador">${u}</td>
-                    <td><canvas id="mini-${idx}" width="35" height="35"></canvas></td>
-                    <td class="bg-emerald-50">${fmtMoeda(d.d.v)} <span class="qtd-sub">${d.d.q} Op</span></td>
-                    <td class="bg-red-50"><div class="input-wrapper">R$<input type="number" value="${sS}" class="input-money" oninput="salvarInput(this, 'sangria_${u}', '${u}', ${d.d.v})"></div></td>
-                    <td class="bg-emerald-100 font-black" id="malote-${u}">${fmtMoeda(d.d.v - sS)}</td>
-                    <td class="bg-slate-50"><div class="input-wrapper">R$<input type="number" value="${sF}" class="input-money" oninput="salvarInput(this, 'falta_${u}')"></div></td>
-                    <td>${fmtMoeda(d.px.v)} <span class="qtd-sub">${d.px.q} Op</span></td>
-                    <td>${fmtMoeda(d.pxm.v)} <span class="qtd-sub">${d.pxm.q} Op</span></td>
-                    <td>${fmtMoeda(d.cr.v)} <span class="qtd-sub">${d.cr.q} Op</span></td>
-                    <td>${fmtMoeda(d.db.v)} <span class="qtd-sub">${d.db.q} Op</span></td>
-                    <td>${fmtMoeda(d.mn.v)} <span class="qtd-sub">${d.mn.q} Op</span></td>
-                    <td>${fmtMoeda(d.ft.v)} <span class="qtd-sub">${d.ft.q} Op</span></td>
+                    <td><canvas id="mini-${i}" width="35" height="35"></canvas></td>
+                    <td class="bg-emerald-50">${fmtM(d.d.v)} <span class="qtd-sub">${d.d.q} Op</span></td>
+                    <td class="bg-red-50"><div class="input-wrapper">R$<input type="number" step="0.01" value="${sS}" class="input-money" oninput="salvarLocal(this, 'sangria_${u}_${key}', '${u}', ${d.d.v})"></div></td>
+                    <td class="bg-emerald-100 font-black" id="malote-${u}">${fmtM(d.d.v - sS)}</td>
+                    <td class="bg-slate-50"><div class="input-wrapper">R$<input type="number" step="0.01" value="${sF}" class="input-money" oninput="salvarLocal(this, 'falta_${u}_${key}')"></div></td>
+                    <td>${fmtM(d.px.v)} <span class="qtd-sub">${d.px.q} Op</span></td>
+                    <td>${fmtM(d.pxm.v)} <span class="qtd-sub">${d.pxm.q} Op</span></td>
+                    <td>${fmtM(d.cr.v)} <span class="qtd-sub">${d.cr.q} Op</span></td>
+                    <td>${fmtM(d.db.v)} <span class="qtd-sub">${d.db.q} Op</span></td>
+                    <td>${fmtM(d.mn.v)} <span class="qtd-sub">${d.mn.q} Op</span></td>
+                    <td>${fmtM(d.ft.v)} <span class="qtd-sub">${d.ft.q} Op</span></td>
                     <td>${d.gr.q} Q</td>
-                    <td class="bg-[#004687] text-white"><b>${fmtMoeda(d.total)}</b><span class="qtd-sub text-white/70">${d.qtd} Total</span></td>
+                    <td class="bg-[#004687] text-white"><b>${fmtM(d.total)}</b><span class="qtd-sub text-white/70">${d.qtd} Total</span></td>
                 </tr>`;
-                setTimeout(() => renderMiniChart(`mini-${idx}`, d), 50);
+                setTimeout(() => renderMini(`mini-${i}`, d), 50);
             });
-            renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users);
+            renderCharts(resG, hTerm, hT, triV, terms, users);
         }
 
-        // Função genérica para salvar dados digitados
-        function salvarInput(el, key, user, dinheiro) {
-            const val = el.value || 0;
-            localStorage.setItem(key, val);
-            
-            // Se for sangria, atualiza o malote em tempo real
-            if (user) {
-                document.getElementById(`malote-${user}`).innerText = fmtMoeda(dinheiro - parseFloat(val));
-            }
+        function salvarLocal(inp, ch, user, din) {
+            const v = inp.value || 0;
+            localStorage.setItem(ch, v);
+            if (user) document.getElementById(`malote-${user}`).innerText = fmtM(din - parseFloat(v));
         }
 
-        function renderMiniChart(id, d) { new Chart(document.getElementById(id), { type: 'doughnut', data: { datasets: [{ data: [d.d.v, d.px.v, d.ft.v, d.cr.v + d.db.v + d.mn.v], backgroundColor: ['#10b981', '#f7a61a', '#004687', '#3b82f6'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false }, datalabels: { display: false } }, maintainAspectRatio: false } }); }
+        function renderMini(id, d) { new Chart(document.getElementById(id), { type: 'doughnut', data: { datasets: [{ data: [d.d.v, d.px.v, d.ft.v, d.cr.v + d.db.v + d.mn.v], backgroundColor: ['#10b981', '#f7a61a', '#004687', '#3b82f6'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false }, datalabels: { display: false } }, maintainAspectRatio: false } }); }
 
-        function renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users) {
+        function renderCharts(resG, hTerm, hT, triV, terms, users) {
             Object.values(charts).forEach(c => c.destroy());
-            const barOptions = (isMoeda) => ({
-                responsive: true, maintainAspectRatio: false,
-                layout: { padding: { top: 25 } },
-                plugins: { 
-                    legend: { display: false }, 
-                    datalabels: { anchor: 'end', align: 'top', offset: 4, color: '#475569', font: { weight: '900', size: 10 }, formatter: (v) => isMoeda ? v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0}) : v } 
-                },
-                scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 9, weight: 'bold' } } } }
-            });
-            const pieOpt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, datalabels: { color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (v, ctx) => ((v * 100) / ctx.dataset.data.reduce((a, b) => a + b, 0)).toFixed(1) + "%" } } };
+            const bOpt = (m) => ({ responsive:true, maintainAspectRatio:false, layout:{padding:{top:25}}, plugins:{legend:{display:false}, datalabels:{anchor:'end', align:'top', offset:4, color:'#475569', font:{weight:'900', size:10}, formatter:(v)=>m ? v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}) : v}}, scales:{y:{beginAtZero:true, grid:{display:false}, ticks:{display:false}}, x:{grid:{display:false}, ticks:{autoSkip:false, font:{size:9, weight:'bold'}}}}});
+            const pOpt = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true, position:'bottom', labels:{boxWidth:10, font:{size:9}}}, datalabels:{color:'#fff', font:{weight:'bold', size:11}, formatter:(v, ctx)=>((v*100)/ctx.dataset.data.reduce((a,b)=>a+b,0)).toFixed(1)+"%"}}};
             
-            charts.mix = new Chart(document.getElementById('chartMix'), { type: 'doughnut', data: { labels: ['Dinheiro', 'Pix', 'Cartão', 'Faturado'], datasets: [{ data: [resG.d, resG.px + resG.pxm, resG.cr+resG.db+resG.mn, resG.ft], backgroundColor: ['#10b981', '#f7a61a', '#3b82f6', '#004687'] }] }, options: pieOpt });
-            charts.veiculos = new Chart(document.getElementById('chartVeiculos'), { type: 'pie', data: { labels: ['Truck', 'Carreta', 'Bitrem'], datasets: [{ data: [triVeic.truck, triVeic.carreta, triVeic.bitrem], backgroundColor: ['#94a3b8', '#004687', '#f7a61a'] }] }, options: pieOpt });
-            const hL = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + "h");
-            charts.hora = new Chart(document.getElementById('chartHora'), { type: 'line', data: { labels: hL, datasets: Object.keys(fluxoHoraTerminal).map((t, i) => ({ label: t, data: hL.map(h => fluxoHoraTerminal[t][h] || 0), borderColor: ['#004687', '#f7a61a', '#10b981', '#6366f1'][i%4], tension: 0.3, borderWidth: 2, pointRadius: 2 })) }, options: { ...barOptions(false), plugins: { ...barOptions(false).plugins, legend: { display: true, position: 'top' }, datalabels: { display: false } } } });
-            charts.horaTotal = new Chart(document.getElementById('chartHoraTotal'), { type: 'line', data: { labels: hL, datasets: [{ data: hL.map(h => fluxoHoraTotal[h] || 0), borderColor: '#f7a61a', fill: true, backgroundColor: '#f7a61a15', tension: 0.3 }] }, options: barOptions(false) });
-            const rFin = Object.entries(users).sort((a,b) => b[1].total - a[1].total).slice(0, 5);
-            charts.rank = new Chart(document.getElementById('chartRanking'), { type: 'bar', data: { labels: rFin.map(x=>x[0]), datasets: [{ data: rFin.map(x=>x[1].total), backgroundColor: '#004687' }] }, options: barOptions(true) });
-            const rQty = Object.entries(users).sort((a,b) => b[1].qtd - a[1].qtd).slice(0, 5);
-            charts.rankQty = new Chart(document.getElementById('chartRankingQty'), { type: 'bar', data: { labels: rQty.map(x=>x[0]), datasets: [{ data: rQty.map(x=>x[1].qtd), backgroundColor: '#10b981' }] }, options: barOptions(false) });
-            const tSort = Object.entries(terms).sort((a,b) => b[1] - a[1]);
-            charts.term = new Chart(document.getElementById('chartTerminais'), { type: 'bar', data: { labels: tSort.map(x=>x[0]), datasets: [{ data: tSort.map(x=>x[1]), backgroundColor: '#3b82f6' }] }, options: barOptions(false) });
+            charts.mix = new Chart(document.getElementById('chartMix'), { type:'doughnut', data:{labels:['Dinheiro','Pix','Cartão','Faturado'], datasets:[{data:[resG.d, resG.px+resG.pxm, resG.cr+resG.db+resG.mn, resG.ft], backgroundColor:['#10b981','#f7a61a','#3b82f6','#004687']}]}, options:pOpt});
+            charts.veiculos = new Chart(document.getElementById('chartVeiculos'), { type:'pie', data:{labels:['Truck','Carreta','Bitrem'], datasets:[{data:[triV.truck, triV.carreta, triV.bitrem], backgroundColor:['#94a3b8','#004687','#f7a61a']}]}, options:pOpt});
+            
+            const hl = Array.from({length:24}, (_,i)=>i.toString().padStart(2,'0')+"h");
+            
+            // GRÁFICO ATUALIZADO: Adicionado rótulos de dados (datalabels) na cor cinza escuro (#475569)
+            charts.hora = new Chart(document.getElementById('chartHora'), { 
+                type:'line', 
+                data:{
+                    labels:hl, 
+                    datasets:Object.keys(hTerm).map((t,i)=>({
+                        label:t, 
+                        data:hl.map(h=>hTerm[t][h]||0), 
+                        borderColor:['#004687','#f7a61a','#10b981','#6366f1'][i%4], 
+                        tension:0.3, 
+                        borderWidth:2, 
+                        pointRadius:2
+                    }))
+                }, 
+                options:{
+                    ...bOpt(false), 
+                    plugins:{
+                        ...bOpt(false).plugins, 
+                        legend:{display:true, position:'top'}, 
+                        datalabels:{
+                            display: true,
+                            anchor: 'end',
+                            align: 'top',
+                            color: '#475569',
+                            font: { weight: 'bold', size: 10 },
+                            offset: 2
+                        }
+                    }
+                }
+            });
+
+            charts.horaT = new Chart(document.getElementById('chartHoraTotal'), { type:'line', data:{labels:hl, datasets:[{data:hl.map(h=>hT[h]||0), borderColor:'#f7a61a', fill:true, backgroundColor:'#f7a61a15', tension:0.3}]}, options:bOpt(false)});
+            const rF = Object.entries(users).sort((a,b)=>b[1].total-a[1].total).slice(0,5);
+            charts.rank = new Chart(document.getElementById('chartRanking'), { type:'bar', data:{labels:rF.map(x=>x[0]), datasets:[{data:rF.map(x=>x[1].total), backgroundColor:'#004687'}]}, options:bOpt(true)});
+            const rQ = Object.entries(users).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0,5);
+            charts.rankQ = new Chart(document.getElementById('chartRankingQty'), { type:'bar', data:{labels:rQ.map(x=>x[0]), datasets:[{data:rQ.map(x=>x[1].qtd), backgroundColor:'#10b981'}]}, options:bOpt(false)});
+            const tS = Object.entries(terms).sort((a,b)=>b[1]-a[1]);
+            charts.term = new Chart(document.getElementById('chartTerminais'), { type:'bar', data:{labels:tS.map(x=>x[0]), datasets:[{data:tS.map(x=>x[1]), backgroundColor:'#3b82f6'}]}, options:bOpt(false)});
         }
 
-        function limparSistema() { if(confirm('Resetar dados (incluindo sangrias e faltas)?')) { localStorage.clear(); location.reload(); } }
-        function logout() { localStorage.removeItem('elog_session_exp'); location.reload(); }
+        function limparSistema() { if(confirm('Isso apagará todos os dados, senhas e configurações. Continuar?')) { localStorage.clear(); location.reload(); } }
+        function resetarFiltros() { document.getElementById('filter-start').value = ""; document.getElementById('filter-end').value = ""; selectTerminal.setSelected([]); selectOperador.setSelected([]); selectVeiculo.setSelected([]); filtrarDados(); }
     </script>
 </body>
 </html>
