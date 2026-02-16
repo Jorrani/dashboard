@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-LOG OPERATIONAL INTELLIGENCE</title>
+    
+    <link rel="icon" type="image/png" href="Favicon.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <link href="https://cdn.jsdelivr.net/npm/slim-select@2.8.2/dist/slimselect.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/slim-select@2.8.2/dist/slimselect.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        :root { --elog-blue: #004687; --elog-orange: #f7a61a; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        
+        #login-screen { 
+            position: fixed; inset: 0; 
+            background: linear-gradient(rgba(0, 70, 135, 0.85), rgba(15, 23, 42, 0.9)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop'); 
+            background-size: cover; background-position: center;
+            z-index: 10000; display: flex; align-items: center; justify-content: center; 
+        }
+        .login-card { 
+            background: white; padding: 3rem 2.5rem; border-radius: 2rem; 
+            width: 100%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); 
+            border-top: 8px solid var(--elog-orange); text-align: center;
+        }
+
+        #dashboard-wrapper { display: none; padding: 20px; }
+        .report-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2.5rem; padding-bottom: 1.5rem; position: relative; }
+        .report-header::after { content: ''; position: absolute; bottom: 0; width: 150px; height: 3px; background: linear-gradient(90deg, transparent, var(--elog-blue), transparent); }
+        
+        .signature-exec { margin-top: 0.75rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.4em; color: #94a3b8; font-weight: 300; display: flex; align-items: center; gap: 15px; }
+        .signature-exec b { color: #475569; font-weight: 700; letter-spacing: 0.1em; }
+        .signature-exec::before, .signature-exec::after { content: ''; width: 20px; height: 1px; background-color: #cbd5e1; }
+
+        /* Filtros Avançados - Ajustados para Múltipla Seleção */
+        .filter-panel { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1.2fr 1.2fr 1.8fr 1.8fr 0.8fr; gap: 15px; }
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-label { font-size: 10px; font-weight: 900; color: var(--elog-blue); text-transform: uppercase; margin-bottom: 5px; }
+        .filter-input { padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 600; outline: none; height: 38px; }
+
+        /* Estilo SlimSelect */
+        .ss-main { font-size: 11px !important; border-radius: 6px !important; border-color: #cbd5e1 !important; height: 38px !important; }
+
+        .chart-container { background: white; border-radius: 1rem; padding: 1.25rem; border: 1px solid #e2e8f0; height: 350px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); display: flex; flex-direction: column; }
+        .chart-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
+        .chart-title { font-size: 11px; font-weight: 900; color: #475569; text-transform: uppercase; text-align: center; margin-bottom: 12px; border-bottom: 2px solid #f8fafc; padding-bottom: 8px; letter-spacing: 0.5px; }
+        
+        th { background-color: #f1f5f9; font-size: 10px; text-transform: uppercase; color: var(--elog-blue); border: 1px solid #e2e8f0; padding: 12px 2px !important; text-align: center; }
+        td { font-size: 11.5px; padding: 8px 2px !important; border: 1px solid #f1f5f9; white-space: nowrap; font-weight: 700; text-align: center; }
+        .nome-operador { font-size: 13px; font-weight: 800; color: var(--elog-blue); text-align: left !important; padding-left: 15px !important; }
+        .qtd-sub { display: block; font-size: 9px; color: #94a3b8; font-weight: 600; margin-top: -2px; }
+        
+        .input-wrapper { display: flex; align-items: center; background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0 2px; width: 85px; margin: 0 auto; }
+        .input-money { width: 100%; border: none; outline: none; text-align: right; font-weight: 800; color: #1e293b; font-size: 11px; background: transparent; }
+
+        @media print { .no-print { display: none !important; } body { zoom: 0.52; background: white; padding: 0; } .chart-container { box-shadow: none; border: 1px solid #eee; } }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="mb-8">
+                <img src="Favicon.png" alt="Logo E-LOG" class="mx-auto h-28 mb-4 object-contain">
+                <h2 class="text-[#004687] text-xl font-black uppercase tracking-tighter">Operational Intelligence</h2>
+                <div class="h-1.5 w-16 bg-[#f7a61a] mx-auto mt-2 rounded-full"></div>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="user-input" placeholder="Usuário" class="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#004687] font-semibold transition-all bg-slate-50">
+                <input type="password" id="pass-input" placeholder="Senha" class="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#004687] font-semibold transition-all bg-slate-50">
+                <button onclick="tentarLogin()" class="w-full bg-[#004687] text-white font-black py-4 rounded-full hover:bg-blue-900 transition-all uppercase text-sm shadow-xl active:scale-[0.98] mt-2">Acessar Dashboard</button>
+                <p id="login-error" class="text-red-500 text-[11px] font-bold text-center uppercase hidden pt-2">Credenciais Inválidas</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-wrapper">
+        <div class="max-w-[1750px] mx-auto">
+            <div class="report-header">
+                <img src="Favicon.png" alt="E-LOG" class="h-16 mb-2">
+                <h2 class="text-4xl font-black text-[#004687] uppercase tracking-tighter">E-LOG <span class="text-[#f7a61a]">OPERATIONAL</span> INTELLIGENCE</h2>
+                <div class="signature-exec">Desenvolvido por <b>Jorrani Salles</b></div>
+            </div>
+
+            <header class="flex justify-between items-center mb-6 no-print bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <h1 class="text-sm font-black text-[#004687] uppercase">Monitoramento Ativo</h1>
+                </div>
+                <div class="flex gap-3">
+                    <button onclick="logout()" class="text-slate-400 font-bold text-xs uppercase px-4">Sair</button>
+                    <button onclick="limparSistema()" class="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg font-bold uppercase text-xs">Limpar</button>
+                    <button onclick="window.print()" class="bg-slate-800 text-white px-6 py-2 rounded-lg font-bold uppercase text-xs">Imprimir</button>
+                    <label class="cursor-pointer bg-[#004687] text-white px-6 py-2 rounded-lg font-bold uppercase text-xs shadow-lg hover:bg-blue-900 transition-colors">
+                        Importar XLS/XLSX
+                        <input type="file" id="input-file" class="hidden" accept=".xlsx, .xls, .csv" onchange="processarArquivo(event)">
+                    </label>
+                </div>
+            </header>
+
+            <div id="exec-section" class="hidden">
+                <div class="filter-panel no-print">
+                    <div class="filter-group">
+                        <label class="filter-label">Data/Hora Inicial</label>
+                        <input type="datetime-local" id="filter-start" class="filter-input" onchange="filtrarDados()">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Data/Hora Final</label>
+                        <input type="datetime-local" id="filter-end" class="filter-input" onchange="filtrarDados()">
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Filtrar Terminais (Múltiplos)</label>
+                        <select id="filter-terminal" multiple onchange="filtrarDados()"></select>
+                    </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Filtrar Operadores (Múltiplos)</label>
+                        <select id="filter-operador" multiple onchange="filtrarDados()"></select>
+                    </div>
+                    <div class="filter-group justify-end">
+                        <button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Limpar Filtros</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-7 gap-4 mb-8">
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-slate-400 shadow-sm">
+                        <p class="text-[10px] uppercase text-slate-400 font-black mb-1">Período Selecionado</p>
+                        <div id="periodo-relatorio" class="text-[10px] font-black text-slate-700 leading-tight">...</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-blue-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Liberações</p><h2 id="total-liberacoes" class="text-2xl font-black text-blue-600">0</h2></div>
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-emerald-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Dinheiro</p><h2 id="kpi-dinheiro" class="text-2xl font-black text-emerald-600">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-orange-400 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Pix</p><h2 id="kpi-pix" class="text-2xl font-black text-orange-500">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-cyan-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Cartões</p><h2 id="kpi-cartoes" class="text-2xl font-black text-cyan-600">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-4 border-l-4 border-indigo-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Faturado</p><h2 id="kpi-faturado" class="text-2xl font-black text-indigo-600">R$ 0,00</h2></div>
+                    <div class="bg-[#004687] rounded-xl p-4 shadow-lg text-white"><p class="text-[10px] uppercase opacity-70 font-black mb-1">Total</p><h2 id="total-geral" class="text-2xl font-black">R$ 0,00</h2></div>
+                </div>
+
+                <div class="grid grid-cols-12 gap-6 mb-8">
+                    <div class="col-span-3 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Mix de Receita (%)</p><div class="chart-wrapper"><canvas id="chartMix"></canvas></div></div>
+                        <div class="chart-container"><p class="chart-title">Mix de Veículos (%)</p><div class="chart-wrapper"><canvas id="chartVeiculos"></canvas></div></div>
+                    </div>
+                    <div class="col-span-6 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Fluxo por Hora / Terminal</p><div class="chart-wrapper"><canvas id="chartHora"></canvas></div></div>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div class="chart-container"><p class="chart-title">Top 5 Financeiro</p><div class="chart-wrapper"><canvas id="chartRanking"></canvas></div></div>
+                            <div class="chart-container"><p class="chart-title">Top 5 Volume</p><div class="chart-wrapper"><canvas id="chartRankingQty"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="col-span-3 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Pico de Tráfego</p><div class="chart-wrapper"><canvas id="chartHoraTotal"></canvas></div></div>
+                        <div class="chart-container"><p class="chart-title">Distribuição Terminais</p><div class="chart-wrapper"><canvas id="chartTerminais"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden mb-8">
+                    <table class="w-full border-collapse">
+                        <thead>
+                            <tr>
+                                <th class="px-4">Operador</th>
+                                <th style="width: 40px;">Mix</th>
+                                <th class="bg-emerald-50">Dinheiro</th>
+                                <th class="bg-red-50 text-red-600">Sangria</th>
+                                <th class="bg-emerald-100">Malote</th>
+                                <th class="bg-slate-50">± Falta</th>
+                                <th>Pix</th>
+                                <th>Pix M.</th>
+                                <th>Crédito</th>
+                                <th>Débito</th>
+                                <th>C. Manual</th>
+                                <th>Faturado</th>
+                                <th>Grátis</th>
+                                <th class="bg-[#004687] text-white">Total Acumulado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-detail-body" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const USER_AUTH = "admin";
+        const PASS_AUTH = "elog2024";
+        const SESSION_TIME = 30 * 60 * 1000;
+        let DADOS_ORIGINAIS = [];
+        let selectTerminal, selectOperador;
+
+        const OPERADORES = { 
+            "164": "JORRANI SALLES", "165": "THAINA DO NASCIMENTO", "167": "NAUZIDE MARIA",
+            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE TATIANA COUTINHO", "177": "MARILUCE MARIA",
+            "188": "PAULO FILHO", "234": "CAMILA BASTOS", "239": "LUIS SABINO",
+            "251": "ERIKSON SILVA", "256": "TATIELE DE PAULA", "257": "AMANDA TATIANE",
+            "260": "BRUNO OLIVEIRA", "261": "CELIA GONDIM", "262": "EDILSON NASCIMENTO",
+            "266": "RAYSSA SILVA", "268": "MARCELO SILVA", "271": "DALETE RAMOS",
+            "273": "MONICA SILVA", "274": "RUAN SILVA"
+        };
+
+        // Inicialização dos Selects Múltiplos
+        window.onload = () => {
+            selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TODOS OS TERMINAIS' } });
+            selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'TODOS OS OPERADORES' } });
+        };
+
+        function tentarLogin() {
+            const u = document.getElementById('user-input').value;
+            const p = document.getElementById('pass-input').value;
+            if (u === USER_AUTH && p === PASS_AUTH) {
+                localStorage.setItem('elog_session_exp', new Date().getTime() + SESSION_TIME);
+                iniciarSistema();
+            } else { document.getElementById('login-error').classList.remove('hidden'); }
+        }
+
+        function iniciarSistema() {
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('dashboard-wrapper').style.display = 'block';
+        }
+
+        function logout() {
+            localStorage.removeItem('elog_session_exp');
+            location.reload();
+        }
+
+        function processarArquivo(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = (evt) => {
+                const data = new Uint8Array(evt.target.result);
+                const wb = XLSX.read(data, { type: 'array', cellDates: true });
+                DADOS_ORIGINAIS = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
+                
+                popularFiltros(DADOS_ORIGINAIS);
+                document.getElementById('exec-section').classList.remove('hidden');
+                filtrarDados();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function popularFiltros(dados) {
+            const terminais = [...new Set(dados.map(l => (l['Terminal'] || l['Equipamento'] || "Pista").toString()))].sort();
+            const idsOps = [...new Set(dados.map(l => l['Usuário']?.toString()))].filter(id => id && id !== "undefined").sort();
+
+            const dataTerms = terminais.map(t => ({ text: t, value: t }));
+            const dataOps = idsOps.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id }));
+
+            selectTerminal.setData(dataTerms);
+            selectOperador.setData(dataOps);
+        }
+
+        function resetarFiltros() {
+            document.getElementById('filter-start').value = "";
+            document.getElementById('filter-end').value = "";
+            selectTerminal.setSelected([]);
+            selectOperador.setSelected([]);
+            filtrarDados();
+        }
+
+        function filtrarDados() {
+            const fStart = document.getElementById('filter-start').value;
+            const fEnd = document.getElementById('filter-end').value;
+            const fTerms = selectTerminal.getSelected();
+            const fOps = selectOperador.getSelected();
+
+            const filtrados = DADOS_ORIGINAIS.filter(l => {
+                const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
+                const terminal = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                const idOp = l['Usuário']?.toString();
+
+                if(fStart && dObj < new Date(fStart)) return false;
+                if(fEnd && dObj > new Date(fEnd)) return false;
+                if(fTerms.length > 0 && !fTerms.includes(terminal)) return false;
+                if(fOps.length > 0 && !fOps.includes(idOp)) return false;
+                return true;
+            });
+
+            atualizarPainel(filtrados);
+        }
+
+        function extrairDataObjeto(valor) {
+            if (!valor) return null;
+            let d = new Date(valor);
+            if (isNaN(d.getTime())) {
+                const partes = valor.toString().split(/[\/\s:]/);
+                if (partes.length >= 3) d = new Date(partes[2], partes[1] - 1, partes[0], partes[3] || 0, partes[4] || 0);
+            }
+            return d;
+        }
+
+        Chart.register(ChartDataLabels);
+        let charts = {};
+        const fmtMoeda = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        function atualizarPainel(dados) {
+            let resG = { d:0, px:0, pxm:0, cr:0, db:0, mn:0, ft:0, gr:0, total:0 };
+            let users = {}, triVeic = { truck:0, carreta:0, bitrem:0 }, terms = {}, fluxoHoraTerminal = {}, fluxoHoraTotal = {}, datasEncontradas = [];
+            
+            dados.forEach(l => {
+                let vRaw = l['Valor'] || 0;
+                if (typeof vRaw === 'string') vRaw = parseFloat(vRaw.replace(/[R$\s.]/g, '').replace(',', '.'));
+                const v = parseFloat(vRaw) || 0;
+                const t = (l['Tipo de Pagamento'] || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                const id = l['Usuário']?.toString();
+                const nome = OPERADORES[id] || id;
+                const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
+                
+                if (dObj && !isNaN(dObj.getTime())) {
+                    datasEncontradas.push(dObj);
+                    const hLabel = dObj.getHours().toString().padStart(2, '0') + "h";
+                    fluxoHoraTotal[hLabel] = (fluxoHoraTotal[hLabel] || 0) + 1;
+                    const term = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                    if (!fluxoHoraTerminal[term]) fluxoHoraTerminal[term] = {};
+                    fluxoHoraTerminal[term][hLabel] = (fluxoHoraTerminal[term][hLabel] || 0) + 1;
+                    terms[term] = (terms[term] || 0) + 1;
+                }
+
+                if (!nome || nome === "undefined") return;
+                if(!users[nome]) users[nome] = { d:{v:0, q:0}, px:{v:0, q:0}, pxm:{v:0, q:0}, cr:{v:0, q:0}, db:{v:0, q:0}, mn:{v:0, q:0}, ft:{v:0, q:0}, gr:{v:0, q:0}, total:0, qtd:0 };
+                
+                users[nome].qtd++; users[nome].total += v; resG.total += v;
+                if (t.includes('dinheiro')) { users[nome].d.v += v; users[nome].d.q++; resG.d += v; } 
+                else if (t === 'pix') { users[nome].px.v += v; users[nome].px.q++; resG.px += v; } 
+                else if (t.includes('pix manual')) { users[nome].pxm.v += v; users[nome].pxm.q++; resG.pxm += v; } 
+                else if (t.includes('credito')) { users[nome].cr.v += v; users[nome].cr.q++; resG.cr += v; } 
+                else if (t.includes('debito')) { users[nome].db.v += v; users[nome].db.q++; resG.db += v; } 
+                else if (t.includes('cartao') || t.includes('manual')) { users[nome].mn.v += v; users[nome].mn.q++; resG.mn += v; }
+                else if (t.includes('faturado')) { users[nome].ft.v += v; users[nome].ft.q++; resG.ft += v; }
+                else if (t.includes('gratis')) { users[nome].gr.q++; }
+
+                const veic = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
+                if (veic.includes('truck')) triVeic.truck++; else if (veic.includes('bitrem')) triVeic.bitrem++; else triVeic.carreta++;
+            });
+
+            if (datasEncontradas.length > 0) {
+                datasEncontradas.sort((a, b) => a - b);
+                const f = (d) => d.toLocaleString('pt-BR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+                document.getElementById('periodo-relatorio').innerHTML = `<span class="text-blue-600">INÍCIO: ${f(datasEncontradas[0])}</span><br><span class="text-orange-600">FIM: ${f(datasEncontradas[datasEncontradas.length-1])}</span>`;
+            }
+
+            document.getElementById('total-geral').innerText = fmtMoeda(resG.total);
+            document.getElementById('total-liberacoes').innerText = dados.length;
+            document.getElementById('kpi-dinheiro').innerText = fmtMoeda(resG.d);
+            document.getElementById('kpi-pix').innerText = fmtMoeda(resG.px + resG.pxm);
+            document.getElementById('kpi-cartoes').innerText = fmtMoeda(resG.cr + resG.db + resG.mn);
+            document.getElementById('kpi-faturado').innerText = fmtMoeda(resG.ft);
+
+            const ub = document.getElementById('user-detail-body'); ub.innerHTML = '';
+            Object.keys(users).sort((a,b) => users[b].total - users[a].total).forEach((u, idx) => {
+                const d = users[u]; const sS = localStorage.getItem(`sangria_${u}`) || 0;
+                ub.innerHTML += `<tr>
+                    <td class="nome-operador">${u}</td>
+                    <td><canvas id="mini-${idx}" width="35" height="35"></canvas></td>
+                    <td class="bg-emerald-50">${fmtMoeda(d.d.v)} <span class="qtd-sub">${d.d.q} Op</span></td>
+                    <td class="bg-red-50"><div class="input-wrapper">R$<input type="number" value="${sS}" class="input-money" oninput="atMalote(this, '${u}', ${d.d.v})"></div></td>
+                    <td class="bg-emerald-100 font-black" id="malote-${u}">${fmtMoeda(d.d.v - sS)}</td>
+                    <td class="bg-slate-50"><div class="input-wrapper">R$<input type="number" class="input-money"></div></td>
+                    <td>${fmtMoeda(d.px.v)} <span class="qtd-sub">${d.px.q} Op</span></td>
+                    <td>${fmtMoeda(d.pxm.v)} <span class="qtd-sub">${d.pxm.q} Op</span></td>
+                    <td>${fmtMoeda(d.cr.v)} <span class="qtd-sub">${d.cr.q} Op</span></td>
+                    <td>${fmtMoeda(d.db.v)} <span class="qtd-sub">${d.db.q} Op</span></td>
+                    <td>${fmtMoeda(d.mn.v)} <span class="qtd-sub">${d.mn.q} Op</span></td>
+                    <td>${fmtMoeda(d.ft.v)} <span class="qtd-sub">${d.ft.q} Op</span></td>
+                    <td>${d.gr.q} Q</td>
+                    <td class="bg-[#004687] text-white"><b>${fmtMoeda(d.total)}</b><span class="qtd-sub text-white/70">${d.qtd} Total</span></td>
+                </tr>`;
+                setTimeout(() => renderMiniChart(`mini-${idx}`, d), 50);
+            });
+            renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users);
+        }
+
+        function atMalote(i, u, d) { localStorage.setItem(`sangria_${u}`, i.value); document.getElementById(`malote-${u}`).innerText = fmtMoeda(d - (parseFloat(i.value)||0)); }
+        function renderMiniChart(id, d) { new Chart(document.getElementById(id), { type: 'doughnut', data: { datasets: [{ data: [d.d.v, d.px.v, d.ft.v, d.cr.v + d.db.v + d.mn.v], backgroundColor: ['#10b981', '#f7a61a', '#004687', '#3b82f6'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false }, datalabels: { display: false } }, maintainAspectRatio: false } }); }
+
+        function renderCharts(resG, fluxoHoraTerminal, fluxoHoraTotal, triVeic, terms, users) {
+            Object.values(charts).forEach(c => c.destroy());
+            const barOptions = (isMoeda) => ({
+                responsive: true, maintainAspectRatio: false,
+                layout: { padding: { top: 25 } }, // Adicionado para rótulos não cortarem
+                plugins: { 
+                    legend: { display: false }, 
+                    datalabels: { 
+                        anchor: 'end', 
+                        align: 'top', 
+                        offset: 4, 
+                        color: '#475569', 
+                        font: { weight: '900', size: 10 }, 
+                        formatter: (v) => isMoeda ? v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0}) : v 
+                    } 
+                },
+                scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 9, weight: 'bold' } } } }
+            });
+            const pieOpt = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true, position: 'bottom', labels: { boxWidth: 10, font: { size: 9 } } }, datalabels: { color: '#fff', font: { weight: 'bold', size: 11 }, formatter: (v, ctx) => ((v * 100) / ctx.dataset.data.reduce((a, b) => a + b, 0)).toFixed(1) + "%" } } };
+            
+            charts.mix = new Chart(document.getElementById('chartMix'), { type: 'doughnut', data: { labels: ['Dinheiro', 'Pix', 'Cartão', 'Faturado'], datasets: [{ data: [resG.d, resG.px + resG.pxm, resG.cr+resG.db+resG.mn, resG.ft], backgroundColor: ['#10b981', '#f7a61a', '#3b82f6', '#004687'] }] }, options: pieOpt });
+            charts.veiculos = new Chart(document.getElementById('chartVeiculos'), { type: 'pie', data: { labels: ['Truck', 'Carreta', 'Bitrem'], datasets: [{ data: [triVeic.truck, triVeic.carreta, triVeic.bitrem], backgroundColor: ['#94a3b8', '#004687', '#f7a61a'] }] }, options: pieOpt });
+            const hL = Array.from({length: 24}, (_, i) => i.toString().padStart(2, '0') + "h");
+            charts.hora = new Chart(document.getElementById('chartHora'), { type: 'line', data: { labels: hL, datasets: Object.keys(fluxoHoraTerminal).map((t, i) => ({ label: t, data: hL.map(h => fluxoHoraTerminal[t][h] || 0), borderColor: ['#004687', '#f7a61a', '#10b981', '#6366f1'][i%4], tension: 0.3, borderWidth: 2, pointRadius: 2 })) }, options: { ...barOptions(false), plugins: { ...barOptions(false).plugins, legend: { display: true, position: 'top' }, datalabels: { display: false } } } });
+            charts.horaTotal = new Chart(document.getElementById('chartHoraTotal'), { type: 'line', data: { labels: hL, datasets: [{ data: hL.map(h => fluxoHoraTotal[h] || 0), borderColor: '#f7a61a', fill: true, backgroundColor: '#f7a61a15', tension: 0.3 }] }, options: barOptions(false) });
+            const rFin = Object.entries(users).sort((a,b) => b[1].total - a[1].total).slice(0, 5);
+            charts.rank = new Chart(document.getElementById('chartRanking'), { type: 'bar', data: { labels: rFin.map(x=>x[0]), datasets: [{ data: rFin.map(x=>x[1].total), backgroundColor: '#004687' }] }, options: barOptions(true) });
+            const rQty = Object.entries(users).sort((a,b) => b[1].qtd - a[1].qtd).slice(0, 5);
+            charts.rankQty = new Chart(document.getElementById('chartRankingQty'), { type: 'bar', data: { labels: rQty.map(x=>x[0]), datasets: [{ data: rQty.map(x=>x[1].qtd), backgroundColor: '#10b981' }] }, options: barOptions(false) });
+            const tSort = Object.entries(terms).sort((a,b) => b[1] - a[1]);
+            charts.term = new Chart(document.getElementById('chartTerminais'), { type: 'bar', data: { labels: tSort.map(x=>x[0]), datasets: [{ data: tSort.map(x=>x[1]), backgroundColor: '#3b82f6' }] }, options: barOptions(false) });
+        }
+
+        function limparSistema() { if(confirm('Resetar dados?')) { localStorage.clear(); location.reload(); } }
+        function logout() { localStorage.removeItem('elog_session_exp'); location.reload(); }
+    </script>
+</body>
+</html>
