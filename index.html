@@ -41,13 +41,11 @@
         .signature-exec b { color: #475569; font-weight: 700; letter-spacing: 0.1em; }
         .signature-exec::before, .signature-exec::after { content: ''; width: 20px; height: 1px; background-color: #cbd5e1; }
 
-        /* Filtros Avançados - Ajustados para Múltipla Seleção */
-        .filter-panel { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1.2fr 1.2fr 1.8fr 1.8fr 0.8fr; gap: 15px; }
+        .filter-panel { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr 1fr 1.2fr 1.2fr 1fr 0.8fr; gap: 12px; }
         .filter-group { display: flex; flex-direction: column; }
         .filter-label { font-size: 10px; font-weight: 900; color: var(--elog-blue); text-transform: uppercase; margin-bottom: 5px; }
         .filter-input { padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 600; outline: none; height: 38px; }
 
-        /* Estilo SlimSelect */
         .ss-main { font-size: 11px !important; border-radius: 6px !important; border-color: #cbd5e1 !important; height: 38px !important; }
 
         .chart-container { background: white; border-radius: 1rem; padding: 1.25rem; border: 1px solid #e2e8f0; height: 350px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); display: flex; flex-direction: column; }
@@ -110,23 +108,31 @@
             <div id="exec-section" class="hidden">
                 <div class="filter-panel no-print">
                     <div class="filter-group">
-                        <label class="filter-label">Data/Hora Inicial</label>
+                        <label class="filter-label">Início</label>
                         <input type="datetime-local" id="filter-start" class="filter-input" onchange="filtrarDados()">
                     </div>
                     <div class="filter-group">
-                        <label class="filter-label">Data/Hora Final</label>
+                        <label class="filter-label">Fim</label>
                         <input type="datetime-local" id="filter-end" class="filter-input" onchange="filtrarDados()">
                     </div>
                     <div class="filter-group">
-                        <label class="filter-label">Filtrar Terminais (Múltiplos)</label>
+                        <label class="filter-label">Terminais</label>
                         <select id="filter-terminal" multiple onchange="filtrarDados()"></select>
                     </div>
                     <div class="filter-group">
-                        <label class="filter-label">Filtrar Operadores (Múltiplos)</label>
+                        <label class="filter-label">Operadores</label>
                         <select id="filter-operador" multiple onchange="filtrarDados()"></select>
                     </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Veículo</label>
+                        <select id="filter-veiculo" multiple onchange="filtrarDados()">
+                            <option value="truck">TRUCK</option>
+                            <option value="carreta">CARRETA</option>
+                            <option value="bitrem">BITREM</option>
+                        </select>
+                    </div>
                     <div class="filter-group justify-end">
-                        <button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Limpar Filtros</button>
+                        <button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Reset</button>
                     </div>
                 </div>
 
@@ -193,11 +199,11 @@
         const PASS_AUTH = "elog2024";
         const SESSION_TIME = 30 * 60 * 1000;
         let DADOS_ORIGINAIS = [];
-        let selectTerminal, selectOperador;
+        let selectTerminal, selectOperador, selectVeiculo;
 
         const OPERADORES = { 
             "164": "JORRANI SALLES", "165": "THAINA DO NASCIMENTO", "167": "NAUZIDE MARIA",
-            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE COUTINHO", "177": "MARILUCE MARIA",
+            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE TATIANA COUTINHO", "177": "MARILUCE MARIA",
             "188": "PAULO FILHO", "234": "CAMILA BASTOS", "239": "LUIS SABINO",
             "251": "ERIKSON SILVA", "256": "TATIELE DE PAULA", "257": "AMANDA TATIANE",
             "260": "BRUNO OLIVEIRA", "261": "CELIA GONDIM", "262": "EDILSON NASCIMENTO",
@@ -205,10 +211,18 @@
             "273": "MONICA SILVA", "274": "RUAN SILVA", "175": "AUDENICE SILVA"
         };
 
-        // Inicialização dos Selects Múltiplos
         window.onload = () => {
-            selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TODOS OS TERMINAIS' } });
-            selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'TODOS OS OPERADORES' } });
+            selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TERMINAIS' } });
+            selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'OPERADORES' } });
+            selectVeiculo = new SlimSelect({ select: '#filter-veiculo', settings: { placeholderText: 'VEÍCULOS' } });
+
+            // Funcionalidade de Login com Enter
+            const inputs = [document.getElementById('user-input'), document.getElementById('pass-input')];
+            inputs.forEach(input => {
+                input.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') tentarLogin();
+                });
+            });
         };
 
         function tentarLogin() {
@@ -225,11 +239,6 @@
             document.getElementById('dashboard-wrapper').style.display = 'block';
         }
 
-        function logout() {
-            localStorage.removeItem('elog_session_exp');
-            location.reload();
-        }
-
         function processarArquivo(e) {
             const file = e.target.files[0];
             const reader = new FileReader();
@@ -237,7 +246,6 @@
                 const data = new Uint8Array(evt.target.result);
                 const wb = XLSX.read(data, { type: 'array', cellDates: true });
                 DADOS_ORIGINAIS = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-                
                 popularFiltros(DADOS_ORIGINAIS);
                 document.getElementById('exec-section').classList.remove('hidden');
                 filtrarDados();
@@ -248,12 +256,8 @@
         function popularFiltros(dados) {
             const terminais = [...new Set(dados.map(l => (l['Terminal'] || l['Equipamento'] || "Pista").toString()))].sort();
             const idsOps = [...new Set(dados.map(l => l['Usuário']?.toString()))].filter(id => id && id !== "undefined").sort();
-
-            const dataTerms = terminais.map(t => ({ text: t, value: t }));
-            const dataOps = idsOps.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id }));
-
-            selectTerminal.setData(dataTerms);
-            selectOperador.setData(dataOps);
+            selectTerminal.setData(terminais.map(t => ({ text: t, value: t })));
+            selectOperador.setData(idsOps.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id })));
         }
 
         function resetarFiltros() {
@@ -261,6 +265,7 @@
             document.getElementById('filter-end').value = "";
             selectTerminal.setSelected([]);
             selectOperador.setSelected([]);
+            selectVeiculo.setSelected([]);
             filtrarDados();
         }
 
@@ -269,16 +274,25 @@
             const fEnd = document.getElementById('filter-end').value;
             const fTerms = selectTerminal.getSelected();
             const fOps = selectOperador.getSelected();
+            const fVeics = selectVeiculo.getSelected();
 
             const filtrados = DADOS_ORIGINAIS.filter(l => {
                 const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
                 const terminal = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
                 const idOp = l['Usuário']?.toString();
+                
+                // Lógica do filtro de veículo
+                const vTipo = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
+                let veiculoMatch = true;
+                if (fVeics.length > 0) {
+                    veiculoMatch = fVeics.some(f => vTipo.includes(f));
+                }
 
                 if(fStart && dObj < new Date(fStart)) return false;
                 if(fEnd && dObj > new Date(fEnd)) return false;
                 if(fTerms.length > 0 && !fTerms.includes(terminal)) return false;
                 if(fOps.length > 0 && !fOps.includes(idOp)) return false;
+                if(!veiculoMatch) return false;
                 return true;
             });
 
@@ -383,17 +397,10 @@
             Object.values(charts).forEach(c => c.destroy());
             const barOptions = (isMoeda) => ({
                 responsive: true, maintainAspectRatio: false,
-                layout: { padding: { top: 25 } }, // Adicionado para rótulos não cortarem
+                layout: { padding: { top: 25 } },
                 plugins: { 
                     legend: { display: false }, 
-                    datalabels: { 
-                        anchor: 'end', 
-                        align: 'top', 
-                        offset: 4, 
-                        color: '#475569', 
-                        font: { weight: '900', size: 10 }, 
-                        formatter: (v) => isMoeda ? v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0}) : v 
-                    } 
+                    datalabels: { anchor: 'end', align: 'top', offset: 4, color: '#475569', font: { weight: '900', size: 10 }, formatter: (v) => isMoeda ? v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0}) : v } 
                 },
                 scales: { y: { beginAtZero: true, grid: { display: false }, ticks: { display: false } }, x: { grid: { display: false }, ticks: { autoSkip: false, font: { size: 9, weight: 'bold' } } } }
             });
@@ -417,5 +424,3 @@
     </script>
 </body>
 </html>
-
-
