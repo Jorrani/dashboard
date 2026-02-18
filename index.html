@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-LOG OPERATIONAL INTELLIGENCE</title>
+    
+    <link rel="icon" type="image/png" href="Favicon.png">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <link href="https://cdn.jsdelivr.net/npm/slim-select@2.8.2/dist/slimselect.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/slim-select@2.8.2/dist/slimselect.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;900&display=swap');
+        :root { --elog-blue: #004687; --elog-orange: #f7a61a; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; margin: 0; padding: 0; user-select: none; -webkit-user-select: none; }
+        
+        /* MODO PRIVACIDADE FINANCEIRO */
+        .money-blur { transition: all 0.3s ease; }
+        .privacy-active .money-blur { 
+            filter: blur(10px) !important;
+            opacity: 0.2; 
+            pointer-events: none; 
+        }
+
+        #loader-overlay {
+            display: none;
+            position: fixed; inset: 0; background: rgba(255,255,255,0.9);
+            z-index: 99999; flex-direction: column; align-items: center; justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+        .spinner { width: 50px; height: 50px; border: 5px solid #f3f3f3; border-top: 5px solid var(--elog-blue); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        #login-screen { 
+            position: fixed; inset: 0; 
+            background: linear-gradient(rgba(0, 70, 135, 0.85), rgba(15, 23, 42, 0.9)), 
+                        url('https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?q=80&w=2070&auto=format&fit=crop');
+            background-size: cover; background-position: center;
+            z-index: 10000; display: flex; align-items: center; justify-content: center;
+        }
+        .login-card { background: white; padding: 3rem 2.5rem; border-radius: 2rem; width: 90%; max-width: 420px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.6); border-top: 8px solid var(--elog-orange); text-align: center; }
+
+        #dashboard-wrapper { display: none; padding: 10px; }
+        @media (min-width: 768px) { #dashboard-wrapper { padding: 20px; } }
+
+        .report-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 2rem; padding-bottom: 1.5rem; position: relative; text-align: center; }
+        .report-header::after { content: ''; position: absolute; bottom: 0; width: 150px; height: 3px; background: linear-gradient(90deg, transparent, var(--elog-blue), transparent); }
+        
+        .signature-exec { margin-top: 0.75rem; font-size: 10px; text-transform: uppercase; letter-spacing: 0.2em; color: #94a3b8; font-weight: 300; display: flex; align-items: center; gap: 10px; }
+        .signature-exec b { color: #475569; font-weight: 700; letter-spacing: 0.1em; }
+        .signature-exec::before, .signature-exec::after { content: ''; width: 20px; height: 1px; background-color: #cbd5e1; }
+
+        .filter-panel { background: white; border-radius: 1rem; padding: 1.25rem; margin-bottom: 1.5rem; border: 1px solid #e2e8f0; display: grid; grid-template-columns: 1fr; gap: 12px; }
+        @media (min-width: 768px) { .filter-panel { grid-template-columns: repeat(3, 1fr); } }
+        @media (min-width: 1024px) { .filter-panel { grid-template-columns: 1fr 1fr 1.2fr 1.2fr 1fr 0.8fr; } }
+
+        .filter-group { display: flex; flex-direction: column; }
+        .filter-label { font-size: 10px; font-weight: 900; color: var(--elog-blue); text-transform: uppercase; margin-bottom: 5px; }
+        .filter-input { padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 11px; font-weight: 600; outline: none; height: 38px; }
+
+        .ss-main { font-size: 11px !important; border-radius: 6px !important; border-color: #cbd5e1 !important; height: 38px !important; }
+
+        .chart-container { background: white; border-radius: 1rem; padding: 1.25rem; border: 1px solid #e2e8f0; min-height: 320px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); display: flex; flex-direction: column; }
+        .chart-wrapper { flex: 1; position: relative; width: 100%; height: 100%; }
+        .chart-title { font-size: 11px; font-weight: 900; color: #475569; text-transform: uppercase; text-align: center; margin-bottom: 12px; border-bottom: 2px solid #f8fafc; padding-bottom: 8px; letter-spacing: 0.5px; }
+        
+        .table-responsive { width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+        th { background-color: #f1f5f9; font-size: 10px; text-transform: uppercase; color: var(--elog-blue); border: 1px solid #e2e8f0; padding: 12px 8px !important; text-align: center; white-space: nowrap; }
+        td { font-size: 11.5px; padding: 8px 4px !important; border: 1px solid #f1f5f9; white-space: nowrap; font-weight: 700; text-align: center; }
+        .nome-operador { font-size: 13px; font-weight: 800; color: var(--elog-blue); text-align: left !important; padding-left: 15px !important; min-width: 180px; }
+        
+        .input-wrapper { display: flex; align-items: center; background: white; border: 1px solid #cbd5e1; border-radius: 4px; padding: 0 2px; width: 85px; margin: 0 auto; }
+        .input-money { width: 100%; border: none; outline: none; text-align: right; font-weight: 800; color: #1e293b; font-size: 11px; background: transparent; }
+
+        @media print { .no-print { display: none !important; } body { zoom: 0.52; background: white; padding: 0; } .chart-container { box-shadow: none; border: 1px solid #eee; } }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+
+    <div id="loader-overlay">
+        <div class="spinner"></div>
+        <p class="mt-4 font-black text-[#004687] text-xs uppercase tracking-widest">Processando base de dados pesada...</p>
+    </div>
+
+    <div id="login-screen">
+        <div class="login-card">
+            <div class="mb-8">
+                <img src="Favicon.png" alt="Logo E-LOG" class="mx-auto h-20 md:h-28 mb-4 object-contain">
+                <h2 class="text-[#004687] text-xl font-black uppercase tracking-tighter">Operational Intelligence</h2>
+                <div class="h-1.5 w-16 bg-[#f7a61a] mx-auto mt-2 rounded-full"></div>
+            </div>
+            <div class="space-y-4">
+                <input type="text" id="user-input" placeholder="Usuário" class="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#004687] font-semibold transition-all bg-slate-50">
+                <input type="password" id="pass-input" placeholder="Senha" class="w-full px-5 py-4 rounded-2xl border border-slate-200 outline-none focus:ring-2 focus:ring-[#004687] font-semibold transition-all bg-slate-50">
+                <button onclick="tentarLogin()" class="w-full bg-[#004687] text-white font-black py-4 rounded-full hover:bg-blue-900 transition-all uppercase text-sm shadow-xl active:scale-[0.98] mt-2">Acessar Dashboard</button>
+                <p id="login-error" class="text-red-500 text-[11px] font-bold text-center uppercase hidden pt-2">Credenciais Inválidas</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-wrapper">
+        <div class="max-w-[1750px] mx-auto">
+            <div class="report-header">
+                <img src="Favicon.png" alt="E-LOG" class="h-12 md:h-16 mb-2">
+                <h2 class="text-2xl md:text-4xl font-black text-[#004687] uppercase tracking-tighter">E-LOG <span class="text-[#f7a61a]">OPERATIONAL</span> INTELLIGENCE</h2>
+                <div class="signature-exec">Desenvolvido por <b>Jorrani Salles</b></div>
+            </div>
+
+            <header class="flex flex-col md:flex-row justify-between items-center gap-4 mb-6 no-print bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+                <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                    <h1 class="text-sm font-black text-[#004687] uppercase">Monitoramento Ativo</h1>
+                </div>
+                <div class="flex flex-wrap justify-center gap-2 md:gap-3">
+                    <button onclick="document.body.classList.toggle('privacy-active')" class="bg-amber-100 text-amber-700 border border-amber-200 px-3 py-2 rounded-lg font-bold uppercase text-xs">Modo Privacidade</button>
+                    <button onclick="logout()" class="text-slate-400 font-bold text-xs uppercase px-2">Sair</button>
+                    <button onclick="limparSistema()" class="bg-red-50 text-red-600 border border-red-200 px-3 py-2 rounded-lg font-bold uppercase text-xs">Limpar</button>
+                    <button onclick="window.print()" class="bg-slate-800 text-white px-4 py-2 rounded-lg font-bold uppercase text-xs">Imprimir</button>
+                    <label class="cursor-pointer bg-[#004687] text-white px-4 py-2 rounded-lg font-bold uppercase text-xs shadow-lg hover:bg-blue-900 transition-colors">
+                        Importar XLS
+                        <input type="file" id="input-file" class="hidden" accept=".xlsx, .xls, .csv" onchange="processarArquivo(event)">
+                    </label>
+                </div>
+            </header>
+
+            <div id="exec-section" class="hidden">
+                <div class="filter-panel no-print">
+                    <div class="filter-group"><label class="filter-label">Início</label><input type="datetime-local" id="filter-start" class="filter-input" onchange="filtrarDados()"></div>
+                    <div class="filter-group"><label class="filter-label">Fim</label><input type="datetime-local" id="filter-end" class="filter-input" onchange="filtrarDados()"></div>
+                    <div class="filter-group"><label class="filter-label">Terminais</label><select id="filter-terminal" multiple onchange="filtrarDados()"></select></div>
+                    <div class="filter-group"><label class="filter-label">Operadores</label><select id="filter-operador" multiple onchange="filtrarDados()"></select></div>
+                    <div class="filter-group"><label class="filter-label">Veículo</label><select id="filter-veiculo" multiple onchange="filtrarDados()"><option value="truck">TRUCK</option><option value="carreta">CARRETA</option><option value="bitrem">BITREM</option></select></div>
+                    <div class="filter-group justify-end"><button onclick="resetarFiltros()" class="bg-slate-100 text-slate-600 font-bold py-2 rounded-lg text-[10px] uppercase border hover:bg-slate-200 h-[38px]">Reset</button></div>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3 mb-8">
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-slate-400 shadow-sm col-span-2 md:col-span-1">
+                        <p class="text-[10px] uppercase text-slate-400 font-black mb-1">Período</p>
+                        <div id="periodo-relatorio" class="text-[10px] font-black text-slate-700 leading-tight">...</div>
+                    </div>
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-blue-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Liberações</p><h2 id="total-liberacoes" class="text-xl font-black text-blue-600">0</h2></div>
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-emerald-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Dinheiro</p><h2 id="kpi-dinheiro" class="text-xl font-black text-emerald-600 money-blur">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-orange-400 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Pix</p><h2 id="kpi-pix" class="text-xl font-black text-orange-500 money-blur">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-cyan-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Cartões</p><h2 id="kpi-cartoes" class="text-xl font-black text-cyan-600 money-blur">R$ 0,00</h2></div>
+                    <div class="bg-white rounded-xl p-3 border-l-4 border-indigo-500 shadow-sm"><p class="text-[10px] uppercase text-slate-400 font-black mb-1">Faturado</p><h2 id="kpi-faturado" class="text-xl font-black text-indigo-600 money-blur">R$ 0,00</h2></div>
+                    <div class="bg-[#004687] rounded-xl p-3 shadow-lg text-white col-span-2 lg:col-span-1"><p class="text-[10px] uppercase opacity-70 font-black mb-1">Total</p><h2 id="total-geral" class="text-xl font-black money-blur">R$ 0,00</h2></div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
+                    <div class="lg:col-span-3 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Mix de Receita (%)</p><div class="chart-wrapper"><canvas id="chartMix"></canvas></div></div>
+                        <div class="chart-container"><p class="chart-title">Mix de Veículos (%)</p><div class="chart-wrapper"><canvas id="chartVeiculos"></canvas></div></div>
+                    </div>
+                    <div class="lg:col-span-6 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Fluxo por Hora / Terminal</p><div class="chart-wrapper"><canvas id="chartHora"></canvas></div></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="chart-container money-blur"><p class="chart-title">Top 5 Financeiro</p><div class="chart-wrapper"><canvas id="chartRanking"></canvas></div></div>
+                            <div class="chart-container"><p class="chart-title">Top 5 Volume</p><div class="chart-wrapper"><canvas id="chartRankingQty"></canvas></div></div>
+                        </div>
+                    </div>
+                    <div class="lg:col-span-3 space-y-6">
+                        <div class="chart-container"><p class="chart-title">Pico de Tráfego</p><div class="chart-wrapper"><canvas id="chartHoraTotal"></canvas></div></div>
+                        <div class="chart-container"><p class="chart-title">Distribuição Terminais</p><div class="chart-wrapper"><canvas id="chartTerminais"></canvas></div></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden mb-8">
+                    <div class="table-responsive">
+                        <table class="w-full border-collapse">
+                            <thead>
+                                <tr>
+                                    <th class="px-4">Operador</th>
+                                    <th style="width: 40px;">Mix</th>
+                                    <th class="bg-emerald-50">Dinheiro</th>
+                                    <th class="bg-red-50 text-red-600">Sangria</th>
+                                    <th class="bg-emerald-100">Malote</th>
+                                    <th class="bg-slate-50">± Falta</th>
+                                    <th>Pix</th><th>Pix M.</th><th>Crédito</th><th>Débito</th><th>C. Manual</th><th>Faturado</th><th>Grátis</th>
+                                    <th class="bg-[#004687] text-white">Total Acumulado</th>
+                                </tr>
+                            </thead>
+                            <tbody id="user-detail-body" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const USER_AUTH = "admin";
+        const PASS_AUTH = "elog2024";
+        const SESSION_DURATION = 30 * 60 * 1000;
+        let DADOS_ORIGINAIS = [];
+        let selectTerminal, selectOperador, selectVeiculo;
+        const OPERADORES = { 
+            "164": "JORRANI SALLES", "165": "THAINA DO NASCIMENTO", "167": "NAUZIDE MARIA",
+            "170": "LAUDIA VITÓRIA", "174": "SHYRLENE COUTINHO", "177": "MARILUCE MARIA",
+            "188": "PAULO FILHO", "234": "CAMILA BASTOS", "239": "LUIS SABINO",
+            "251": "ERIKSON SILVA", "256": "TATIELE DE PAULA", "257": "AMANDA TATIANE",
+            "260": "BRUNO OLIVEIRA", "261": "CELIA GONDIM", "262": "EDILSON NASCIMENTO",
+            "266": "RAYSSA SILVA", "268": "MARCELO SILVA", "271": "DALETE RAMOS",
+            "273": "MONICA SILVA", "274": "RUAN SILVA", "175": "AUDENICE SILVA"
+        };
+
+        window.onload = () => {
+            selectTerminal = new SlimSelect({ select: '#filter-terminal', settings: { placeholderText: 'TERMINAIS' } });
+            selectOperador = new SlimSelect({ select: '#filter-operador', settings: { placeholderText: 'OPERADORES' } });
+            selectVeiculo = new SlimSelect({ select: '#filter-veiculo', settings: { placeholderText: 'VEÍCULOS' } });
+            
+            // Adicionando suporte à tecla Enter nos campos de login
+            const camposLogin = [document.getElementById('user-input'), document.getElementById('pass-input')];
+            camposLogin.forEach(campo => {
+                campo.addEventListener('keypress', (e) => {
+                    if (e.key === 'Enter') tentarLogin();
+                });
+            });
+
+            verificarSessao();
+        };
+
+        function verificarSessao() {
+            const exp = localStorage.getItem('elog_session_exp');
+            const agora = new Date().getTime();
+            if (exp && agora < parseInt(exp)) {
+                document.getElementById('login-screen').style.display = 'none';
+                document.getElementById('dashboard-wrapper').style.display = 'block';
+            } else { logout(); }
+        }
+
+        function tentarLogin() {
+            const u = document.getElementById('user-input').value;
+            const p = document.getElementById('pass-input').value;
+            if (u === USER_AUTH && p === PASS_AUTH) {
+                localStorage.setItem('elog_session_exp', new Date().getTime() + SESSION_DURATION);
+                verificarSessao();
+            } else { document.getElementById('login-error').classList.remove('hidden'); }
+        }
+
+        function logout() {
+            localStorage.removeItem('elog_session_exp');
+            document.getElementById('login-screen').style.display = 'flex';
+            document.getElementById('dashboard-wrapper').style.display = 'none';
+        }
+
+        // --- AS DEMAIS FUNÇÕES PERMANECEM IGUAIS ---
+        
+        async function processarArquivo(e) {
+            const file = e.target.files[0];
+            if(!file) return;
+            document.getElementById('loader-overlay').style.display = 'flex';
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                try {
+                    const data = new Uint8Array(evt.target.result);
+                    const wb = XLSX.read(data, { type: 'array', cellDates: true });
+                    DADOS_ORIGINAIS = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
+                    popularFiltros(DADOS_ORIGINAIS);
+                    document.getElementById('exec-section').classList.remove('hidden');
+                    filtrarDados();
+                } catch (err) { alert("Erro ao ler arquivo."); }
+                finally { document.getElementById('loader-overlay').style.display = 'none'; }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function popularFiltros(dados) {
+            const terms = [...new Set(dados.map(l => (l['Terminal'] || l['Equipamento'] || "Pista").toString()))].sort();
+            const ops = [...new Set(dados.map(l => l['Usuário']?.toString()))].filter(id => id && id !== "undefined").sort();
+            selectTerminal.setData(terms.map(t => ({ text: t, value: t })));
+            selectOperador.setData(ops.map(id => ({ text: OPERADORES[id] || `ID: ${id}`, value: id })));
+        }
+
+        function filtrarDados() {
+            const fS = document.getElementById('filter-start').value;
+            const fE = document.getElementById('filter-end').value;
+            const fT = selectTerminal.getSelected();
+            const fO = selectOperador.getSelected();
+            const fV = selectVeiculo.getSelected();
+            const filtrados = DADOS_ORIGINAIS.filter(l => {
+                const dObj = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
+                const term = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                const op = l['Usuário']?.toString();
+                const vT = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
+                if(fS && dObj < new Date(fS)) return false;
+                if(fE && dObj > new Date(fE)) return false;
+                if(fT.length > 0 && !fT.includes(term)) return false;
+                if(fO.length > 0 && !fO.includes(op)) return false;
+                if(fV.length > 0 && !fV.some(f => vT.includes(f))) return false;
+                return true;
+            });
+            atualizarPainel(filtrados);
+        }
+
+        function extrairDataObjeto(val) {
+            if (!val) return null;
+            let d = new Date(val);
+            if (isNaN(d.getTime())) {
+                const p = val.toString().split(/[\/\s:]/);
+                if (p.length >= 3) d = new Date(p[2], p[1] - 1, p[0], p[3] || 0, p[4] || 0);
+            }
+            return d;
+        }
+
+        Chart.register(ChartDataLabels);
+        let charts = {};
+        const fmtM = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+        function atualizarPainel(dados) {
+            let resG = { d:0, px:0, pxm:0, cr:0, db:0, mn:0, ft:0, gr:0, total:0 };
+            let users = {}, triV = { truck:0, carreta:0, bitrem:0 }, terms = {}, hT = {}, hTerm = {}, dts = [];
+
+            dados.forEach(l => {
+                let vR = l['Valor'] || 0;
+                if (typeof vR === 'string') vR = parseFloat(vR.replace(/[R$\s.]/g, '').replace(',', '.'));
+                const v = parseFloat(vR) || 0;
+                const tp = (l['Tipo de Pagamento'] || "").toString().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+                const id = l['Usuário']?.toString();
+                const nm = OPERADORES[id] || id;
+                const dO = extrairDataObjeto(l['Data Movimento/Saida'] || l['Data Saida'] || l['Data']);
+
+                if (dO && !isNaN(dO.getTime())) {
+                    dts.push(dO);
+                    const hl = dO.getHours().toString().padStart(2, '0') + "h";
+                    hT[hl] = (hT[hl] || 0) + 1;
+                    const tm = (l['Terminal'] || l['Equipamento'] || "Pista").toString();
+                    if (!hTerm[tm]) hTerm[tm] = {};
+                    hTerm[tm][hl] = (hTerm[tm][hl] || 0) + 1;
+                    terms[tm] = (terms[tm] || 0) + 1;
+                }
+
+                if (!nm || nm === "undefined") return;
+                if(!users[nm]) users[nm] = { d:{v:0,q:0}, px:{v:0,q:0}, pxm:{v:0,q:0}, cr:{v:0,q:0}, db:{v:0,q:0}, mn:{v:0,q:0}, ft:{v:0,q:0}, gr:{v:0,q:0}, total:0, qtd:0, dRef:'' };
+                if(!users[nm].dRef && dO) users[nm].dRef = dO.toLocaleDateString('pt-BR').replace(/\//g,'');
+
+                users[nm].qtd++; users[nm].total += v; resG.total += v;
+                if (tp.includes('dinheiro')) { users[nm].d.v += v; users[nm].d.q++; resG.d += v; }
+                else if (tp === 'pix') { users[nm].px.v += v; users[nm].px.q++; resG.px += v; }
+                else if (tp.includes('pix manual')) { users[nm].pxm.v += v; users[nm].pxm.q++; resG.pxm += v; }
+                else if (tp.includes('credito')) { users[nm].cr.v += v; users[nm].cr.q++; resG.cr += v; }
+                else if (tp.includes('debito')) { users[nm].db.v += v; users[nm].db.q++; resG.db += v; }
+                else if (tp.includes('cartao') || tp.includes('manual')) { users[nm].mn.v += v; users[nm].mn.q++; resG.mn += v; }
+                else if (tp.includes('faturado')) { users[nm].ft.v += v; users[nm].ft.q++; resG.ft += v; }
+                else if (tp.includes('gratis')) { users[nm].gr.q++; }
+                const vc = (l['Tipo de Veículo'] || l['Categoria'] || "").toString().toLowerCase();
+                if (vc.includes('truck')) triV.truck++; else if (vc.includes('bitrem')) triV.bitrem++; else triV.carreta++;
+            });
+
+            if (dts.length > 0) {
+                dts.sort((a,b)=>a-b);
+                const _f = (d) => d.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+                document.getElementById('periodo-relatorio').innerHTML = `<span class="text-blue-600">INÍCIO: ${_f(dts[0])}</span><br><span class="text-orange-600">FIM: ${_f(dts[dts.length-1])}</span>`;
+            }
+
+            document.getElementById('total-geral').innerText = fmtM(resG.total);
+            document.getElementById('total-liberacoes').innerText = dados.length;
+            document.getElementById('kpi-dinheiro').innerText = fmtM(resG.d);
+            document.getElementById('kpi-pix').innerText = fmtM(resG.px + resG.pxm);
+            document.getElementById('kpi-cartoes').innerText = fmtM(resG.cr + resG.db + resG.mn);
+            document.getElementById('kpi-faturado').innerText = fmtM(resG.ft);
+
+            const body = document.getElementById('user-detail-body'); body.innerHTML = '';
+            Object.keys(users).sort((a,b)=>users[b].total - users[a].total).forEach((u, i) => {
+                const d = users[u];
+                const key = d.dRef || 'sd';
+                const sS = localStorage.getItem(`sangria_${u}_${key}`) || 0;
+                const sF = localStorage.getItem(`falta_${u}_${key}`) || 0;
+
+                body.innerHTML += `<tr>
+                    <td class="nome-operador">${u}</td>
+                    <td class="money-blur"><canvas id="mini-${i}" width="35" height="35"></canvas></td>
+                    <td class="bg-emerald-50 money-blur">${fmtM(d.d.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.d.q} Op</span></td>
+                    <td class="bg-red-50 money-blur"><div class="input-wrapper">R$<input type="number" step="0.01" value="${sS}" class="input-money" oninput="salvarLocal(this, 'sangria_${u}_${key}', '${u}', ${d.d.v})"></div></td>
+                    <td class="bg-emerald-100 font-black money-blur" id="malote-${u}">${fmtM(d.d.v - sS)}</td>
+                    <td class="bg-slate-50 money-blur"><div class="input-wrapper">R$<input type="number" step="0.01" value="${sF}" class="input-money" oninput="salvarLocal(this, 'falta_${u}_${key}')"></div></td>
+                    <td class="money-blur">${fmtM(d.px.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.px.q} Op</span></td>
+                    <td class="money-blur">${fmtM(d.pxm.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.pxm.q} Op</span></td>
+                    <td class="money-blur">${fmtM(d.cr.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.cr.q} Op</span></td>
+                    <td class="money-blur">${fmtM(d.db.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.db.q} Op</span></td>
+                    <td class="money-blur">${fmtM(d.mn.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.mn.q} Op</span></td>
+                    <td class="money-blur">${fmtM(d.ft.v)} <span class="qtd-sub block text-[9px] text-slate-400">${d.ft.q} Op</span></td>
+                    <td>${d.gr.q} Q</td>
+                    <td class="bg-[#004687] text-white"><b class="money-blur">${fmtM(d.total)}</b><span class="qtd-sub block text-[9px] text-white/70">${d.qtd} Total</span></td>
+                </tr>`;
+                setTimeout(() => renderMini(`mini-${i}`, d), 50);
+            });
+            renderCharts(resG, hTerm, hT, triV, terms, users);
+        }
+
+        function salvarLocal(inp, ch, user, din) {
+            const v = inp.value || 0;
+            localStorage.setItem(ch, v);
+            if (user) document.getElementById(`malote-${user}`).innerText = fmtM(din - parseFloat(v));
+        }
+
+        function renderMini(id, d) { new Chart(document.getElementById(id), { type: 'doughnut', data: { datasets: [{ data: [d.d.v, d.px.v, d.ft.v, d.cr.v + d.db.v + d.mn.v], backgroundColor: ['#10b981', '#f7a61a', '#004687', '#3b82f6'], borderWidth: 0 }] }, options: { cutout: '70%', plugins: { legend: { display: false }, datalabels: { display: false } }, maintainAspectRatio: false } }); }
+
+        function renderCharts(resG, hTerm, hT, triV, terms, users) {
+            Object.values(charts).forEach(c => c.destroy());
+            const bOpt = (m) => ({ responsive:true, maintainAspectRatio:false, layout:{padding:{top:25}}, plugins:{legend:{display:false}, datalabels:{anchor:'end', align:'top', offset:4, color:'#475569', font:{weight:'900', size:10}, formatter:(v)=>m ? v.toLocaleString('pt-BR',{style:'currency',currency:'BRL',maximumFractionDigits:0}) : v}}, scales:{y:{beginAtZero:true, grid:{display:false}, ticks:{display:false}}, x:{grid:{display:false}, ticks:{autoSkip:false, font:{size:9, weight:'bold'}}}}});
+            const pOpt = { responsive:true, maintainAspectRatio:false, plugins:{legend:{display:true, position:'bottom', labels:{boxWidth:10, font:{size:9}}}, datalabels:{color:'#fff', font:{weight:'bold', size:11}, formatter:(v, ctx)=>((v*100)/ctx.dataset.data.reduce((a,b)=>a+b,0)).toFixed(1)+"%"}}};
+            charts.mix = new Chart(document.getElementById('chartMix'), { type:'doughnut', data:{labels:['Dinheiro','Pix','Cartão','Faturado'], datasets:[{data:[resG.d, resG.px+resG.pxm, resG.cr+resG.db+resG.mn, resG.ft], backgroundColor:['#10b981','#f7a61a','#3b82f6','#004687']}]}, options:pOpt});
+            charts.veiculos = new Chart(document.getElementById('chartVeiculos'), { type:'pie', data:{labels:['Truck','Carreta','Bitrem'], datasets:[{data:[triV.truck, triV.carreta, triV.bitrem], backgroundColor:['#94a3b8','#004687','#f7a61a']}]}, options:pOpt});
+            const hl = Array.from({length:24}, (_,i)=>i.toString().padStart(2,'0')+"h");
+            charts.hora = new Chart(document.getElementById('chartHora'), { type:'line', data:{ labels:hl, datasets:Object.keys(hTerm).map((t,i)=>({ label:t, data:hl.map(h=>hTerm[t][h]||0), borderColor:['#004687','#f7a61a','#10b981','#6366f1'][i%4], tension:0.3, borderWidth:2, pointRadius:2 })) }, options:{ ...bOpt(false), plugins:{ ...bOpt(false).plugins, legend:{display:true, position:'top'}, datalabels:{ display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0, anchor: 'end', align: 'top', color: '#475569', font: { weight: 'bold', size: 10 } } } } });
+            charts.horaT = new Chart(document.getElementById('chartHoraTotal'), { type:'line', data:{labels:hl, datasets:[{data:hl.map(h=>hT[h]||0), borderColor:'#f7a61a', fill:true, backgroundColor:'#f7a61a15', tension:0.3}]}, options:bOpt(false)});
+            const rF = Object.entries(users).sort((a,b)=>b[1].total-a[1].total).slice(0,5);
+            charts.rank = new Chart(document.getElementById('chartRanking'), { type:'bar', data:{labels:rF.map(x=>x[0]), datasets:[{data:rF.map(x=>x[1].total), backgroundColor:'#004687'}]}, options:bOpt(true)});
+            const rQ = Object.entries(users).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0,5);
+            charts.rankQ = new Chart(document.getElementById('chartRankingQty'), { type:'bar', data:{labels:rQ.map(x=>x[0]), datasets:[{data:rQ.map(x=>x[1].qtd), backgroundColor:'#10b981'}]}, options:bOpt(false)});
+            const tS = Object.entries(terms).sort((a,b)=>b[1]-a[1]);
+            charts.term = new Chart(document.getElementById('chartTerminais'), { type:'bar', data:{labels:tS.map(x=>x[0]), datasets:[{data:tS.map(x=>x[1]), backgroundColor:'#3b82f6'}]}, options:bOpt(false)});
+        }
+
+        function limparSistema() { if(confirm('Isso apagará todos os dados de memória. Continuar?')) { localStorage.clear(); location.reload(); } }
+        function resetarFiltros() { document.getElementById('filter-start').value = ""; document.getElementById('filter-end').value = ""; selectTerminal.setSelected([]); selectOperador.setSelected([]); selectVeiculo.setSelected([]); filtrarDados(); }
+    </script>
+</body>
+</html>
